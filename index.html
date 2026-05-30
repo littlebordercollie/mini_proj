@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#bff0ff">
+<title>数字陷阱</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --sky1:#9fe2ff; --sky2:#d6f7ff; --sky3:#ecfff8;
+  --ink:#0f3a52; --ink2:#3f6b82; --mut:#7aa0b3;
+  --card:rgba(255,255,255,.66); --cardb:rgba(255,255,255,.92);
+  --line:rgba(15,58,82,.10);
+  --teal:#0bb6c4; --teal-d:#089aa6;
+  --mint:#23dca2;
+  --gold:#ff9f1c; --gold-d:#ef8a00;
+  --red:#ff4d57; --red-d:#e5323d;
+  --font:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+}
+html,body{height:100%}
+body{
+  font-family:var(--font); color:var(--ink); overflow:hidden; height:100dvh; line-height:1.3;
+  -webkit-font-smoothing:antialiased; user-select:none;
+  background:
+    radial-gradient(125% 78% at 50% -22%, var(--sky1), transparent 62%),
+    radial-gradient(95% 65% at 88% 116%, #b6f6e4, transparent 56%),
+    linear-gradient(180deg, var(--sky2), var(--sky3));
+}
+.sky{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(56% 38% at 82% 6%, rgba(255,255,255,.75), transparent 60%);}
+.sky::after{content:"";position:absolute;inset:0;opacity:.5;
+  background:radial-gradient(40% 30% at 12% 92%, rgba(255,255,255,.6), transparent 60%);}
+
+.stage{position:relative;z-index:1;height:100dvh;display:flex;flex-direction:column;
+  max-width:560px;margin:0 auto;padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:0 0 auto;position:relative}
+.set-hint{position:absolute;top:calc(100% + 11px);right:6px;z-index:40;cursor:pointer;
+  background:linear-gradient(180deg,#ffb23e,var(--gold));color:#fff;font-size:13px;font-weight:800;
+  padding:9px 14px;border-radius:13px;box-shadow:0 8px 20px rgba(255,159,28,.42);white-space:nowrap;
+  animation:bob 1.7s ease-in-out infinite}
+.set-hint::before{content:"";position:absolute;bottom:100%;right:78px;border:8px solid transparent;border-bottom-color:var(--gold)}
+.set-hint.hide{display:none}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.brand{font-size:15px;font-weight:900;letter-spacing:.04em;color:var(--ink)}
+.brand span{color:var(--teal);font-weight:800}
+.tools{display:flex;gap:6px}
+.tbtn{font-family:inherit;font-size:12.5px;font-weight:800;color:var(--ink2);cursor:pointer;
+  background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 11px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.15s;display:inline-flex;align-items:center;gap:5px}
+.tbtn:active{transform:scale(.96)}
+.tbtn.on{color:#fff;background:var(--teal);border-color:var(--teal)}
+
+/* ---------- arena ---------- */
+.arena{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:space-evenly;gap:8px;padding:4px 0}
+
+/* target big number */
+.targetwrap{text-align:center;line-height:.9}
+.tlabel{font-size:12px;font-weight:800;letter-spacing:.18em;color:var(--red);
+  text-transform:uppercase;margin-bottom:4px;opacity:.85}
+.tnum{font-size:clamp(82px,25vw,180px);font-weight:900;color:var(--red);
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums;
+  text-shadow:0 8px 26px rgba(255,77,87,.28),0 2px 0 #fff;line-height:.86}
+.tnum small{display:block;font-size:.16em;letter-spacing:.1em;color:var(--mut);
+  font-weight:800;margin-top:.1em;text-shadow:none}
+
+/* track pill */
+.trackwrap{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px}
+.track{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;width:100%;
+  padding:14px 14px;border-radius:26px;background:var(--card);border:1px solid var(--cardb);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 12px 34px rgba(15,58,82,.1),inset 0 1px 0 rgba(255,255,255,.7);overflow:auto;scrollbar-width:none}
+.track::-webkit-scrollbar{display:none}
+.cell{flex:1 1 auto;min-width:clamp(38px,11vw,50px);max-width:80px;
+  display:flex;align-items:center;justify-content:center;
+  height:clamp(48px,8.8vh,72px);border-radius:14px;
+  font-size:clamp(20px,5.4vw,32px);font-weight:900;color:var(--ink2);
+  font-variant-numeric:tabular-nums;background:rgba(255,255,255,.5);
+  border:1.5px solid rgba(255,255,255,.85);transition:transform .16s,background .16s,color .16s}
+/* 谁报的就染谁的色：你=暖橙，对方/电脑=蓝 */
+.cell.by-you{background:linear-gradient(180deg,#ffc24d,var(--gold));color:#fff;
+  border-color:var(--gold-d);box-shadow:0 5px 13px rgba(255,159,28,.3)}
+.cell.by-opp{background:linear-gradient(180deg,#62c6ff,#2f8fe0);color:#fff;
+  border-color:#2f8fe0;box-shadow:0 5px 13px rgba(47,143,224,.3)}
+.cell.cur{transform:translateY(-6px) scale(1.13);
+  box-shadow:0 12px 24px rgba(15,58,82,.22),0 0 0 3px rgba(255,255,255,.95),0 0 0 5px rgba(15,58,82,.07)}
+.cell.trap{color:var(--red);border-color:rgba(255,77,87,.45);
+  background:repeating-linear-gradient(45deg,rgba(255,77,87,.13) 0 7px,rgba(255,77,87,.03) 7px 14px)}
+.cell.trap.by-you,.cell.trap.by-opp{background:linear-gradient(180deg,#ff6b73,var(--red));color:#fff;
+  border-color:var(--red-d);box-shadow:0 10px 24px rgba(255,77,87,.45);animation:shake .5s}
+.cell.goal{color:var(--gold-d);border-color:rgba(255,159,28,.5);background:rgba(255,159,28,.12)}
+.cell.goal.by-you,.cell.goal.by-opp{background:linear-gradient(180deg,#ffd24d,var(--gold));color:#fff}
+/* 原理层：控制点平时是普通格，开原理时描青边 */
+body.show-prin .cell.ctrl{border-color:var(--teal);box-shadow:0 0 0 2.5px rgba(11,182,196,.4)}
+body.show-prin .cell.ctrl:not(.by-you):not(.by-opp){background:linear-gradient(180deg,#e4fdff,#c4f6fb);color:var(--teal-d)}
+body.show-prin .cell.rec{animation:recPulse 1.1s ease-in-out infinite}
+@keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(11,182,196,0)}50%{box-shadow:0 0 0 4px rgba(11,182,196,.5)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.cell .pp{animation:pop .24s}
+@keyframes pop{0%{transform:scale(.55);opacity:0}100%{transform:scale(1);opacity:1}}
+
+.prin-note{display:none;width:100%;max-width:480px;text-align:center;
+  background:rgba(11,182,196,.12);border:1.5px solid rgba(11,182,196,.32);border-radius:18px;padding:14px 16px}
+body.show-prin .prin-note{display:block}
+.prin-note .big{font-size:clamp(18px,4.8vw,23px);font-weight:900;color:var(--teal-d);line-height:1.3}
+.prin-note .big b{color:var(--gold-d)}
+.prin-note .sub{font-size:13.5px;font-weight:700;color:var(--ink2);margin-top:7px;line-height:1.45}
+.prin-note .sub b{color:var(--red-d)}
+
+/* control: turn + say buttons */
+.control{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px}
+.turnline{font-size:15px;font-weight:800;color:var(--ink2);display:flex;align-items:center;gap:9px;
+  padding:8px 16px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
+.turnline .dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+.turnline.you{color:var(--gold-d)} .turnline.you .dot{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.turnline.opp{color:#2178c4} .turnline.opp .dot{background:#2f8fe0;box-shadow:0 0 8px #2f8fe0;animation:blink 1s infinite}
+.turnline.done{color:var(--mut)}
+@keyframes blink{50%{opacity:.3}}
+.turnline b{color:var(--ink);font-variant-numeric:tabular-nums}
+.saybar{display:flex;gap:12px;width:100%;justify-content:center}
+.sbtn{flex:1 1 0;max-width:240px;cursor:pointer;font-family:inherit;font-weight:900;color:#fff;
+  background:linear-gradient(180deg,#ffb23e,var(--gold));border:0;border-radius:22px;
+  padding:clamp(18px,3.2vh,32px) 8px;font-size:clamp(20px,5.6vw,28px);
+  box-shadow:0 10px 24px rgba(255,159,28,.36),inset 0 1px 0 rgba(255,255,255,.5);
+  transition:transform .1s,filter .1s;display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1}
+.sbtn small{font-size:.55em;font-weight:800;opacity:.85}
+.sbtn:active{transform:translateY(3px) scale(.98);filter:brightness(.97)}
+.sbtn.rec{background:linear-gradient(180deg,#3fe0d4,var(--teal));box-shadow:0 10px 24px rgba(11,182,196,.4)}
+body:not(.show-prin) .sbtn.rec{background:linear-gradient(180deg,#ffb23e,var(--gold));box-shadow:0 10px 24px rgba(255,159,28,.36)}
+.sbtn:disabled{opacity:.45;pointer-events:none;background:#c8dce6;color:#fff;box-shadow:none}
+
+/* ---------- landscape：大数字居中在上，跑道占满整行、自动换行全可见 ---------- */
+body.is-land .stage{max-width:min(1180px,96vw)}
+body.is-land .arena{justify-content:space-evenly;gap:clamp(8px,2vh,20px)}
+body.is-land .tnum{font-size:clamp(72px,17vh,190px)}
+body.is-land .control{flex-direction:row;justify-content:center;gap:18px}
+body.is-land .saybar{width:auto}
+body.is-land .sbtn{flex:0 0 auto;min-width:150px}
+
+/* ---------- sheet (settings) ---------- */
+.sheet,.result{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+  background:rgba(15,58,82,.3);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:.24s}
+.sheet{justify-content:flex-end;align-items:stretch}
+.sheet.show,.result.show{opacity:1;pointer-events:auto}
+/* 设置：右侧毛玻璃抽屉 */
+.sheet-card{width:min(440px,92vw);height:100%;
+  background:linear-gradient(160deg,rgba(255,255,255,.82),rgba(228,249,255,.76));
+  backdrop-filter:blur(24px) saturate(1.35);-webkit-backdrop-filter:blur(24px) saturate(1.35);
+  border-left:1px solid rgba(255,255,255,.75);border-radius:30px 0 0 30px;
+  padding:24px 22px calc(28px + env(safe-area-inset-bottom));
+  transform:translateX(105%);transition:.3s cubic-bezier(.2,.9,.3,1);box-shadow:-26px 0 70px rgba(15,58,82,.26);
+  overflow-y:auto}
+.sheet.show .sheet-card{transform:none}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.sheet-h{font-size:24px;font-weight:900;color:var(--ink)}
+.sheet-x{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.6);
+  font-size:19px;font-weight:900;color:var(--ink2);cursor:pointer;line-height:1}
+.sheet-x:active{background:rgba(255,255,255,.9)}
+.sheet-sub{font-size:13px;color:var(--mut);margin-bottom:6px}
+.field{margin-top:24px}
+.field .lab{font-size:17px;font-weight:900;color:var(--ink);margin-bottom:3px}
+.field .hint{font-size:13px;color:var(--ink2);opacity:.78;margin-bottom:12px;line-height:1.45}
+.stepper{display:flex;gap:10px}
+.stepper button{width:58px;height:58px;font-size:30px;font-weight:900;color:var(--teal-d);
+  background:rgba(255,255,255,.72);border:1.5px solid var(--line);border-radius:16px;cursor:pointer}
+.stepper button:active{background:#d7f3fb}
+.stepper input{flex:1;text-align:center;font-family:inherit;font-weight:900;font-size:36px;color:var(--ink);
+  background:rgba(255,255,255,.88);border:1.5px solid var(--line);border-radius:16px;min-width:0;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.chip{cursor:pointer;font-family:inherit;font-size:14.5px;font-weight:800;color:var(--ink2);
+  background:rgba(255,255,255,.72);border:1.5px solid var(--line);border-radius:999px;padding:9px 18px}
+.chip.on{color:#fff;background:var(--red);border-color:var(--red)}
+.seg{display:flex;gap:9px;flex-wrap:wrap}
+.seg button{flex:1 1 auto;min-width:74px;cursor:pointer;font-family:inherit;font-weight:800;font-size:16px;
+  color:var(--ink2);background:rgba(255,255,255,.72);border:1.5px solid var(--line);border-radius:15px;padding:16px 8px;transition:.14s}
+.seg button.on{color:#fff;background:var(--teal);border-color:var(--teal)}
+.seg.gold button.on{background:var(--gold);border-color:var(--gold)}
+.sheet-go{width:100%;margin-top:28px;cursor:pointer;font-family:inherit;font-weight:900;font-size:19px;color:#fff;
+  background:linear-gradient(180deg,#ffb23e,var(--gold));border:0;border-radius:18px;padding:18px;
+  box-shadow:0 10px 24px rgba(255,159,28,.36)}
+
+/* ---------- result ---------- */
+.result-card{width:100%;max-width:330px;margin:0 20px;text-align:center;padding:32px 24px;border-radius:28px;
+  background:linear-gradient(180deg,#fff,var(--sky3));border:1px solid var(--cardb);
+  transform:translateY(20px) scale(.94);transition:.26s;box-shadow:0 30px 80px rgba(15,58,82,.28)}
+.result.show .result-card{transform:none}
+.r-emoji{font-size:58px;line-height:1}
+.r-title{font-size:28px;font-weight:900;margin:10px 0 6px}
+.result.win .r-title{color:var(--teal-d)} .result.lose .r-title{color:var(--red-d)}
+.r-text{font-size:14px;color:var(--ink2);margin-bottom:22px;line-height:1.5}
+.r-text b{color:var(--ink)}
+.r-btns{display:flex;gap:10px}
+.r-btns button{flex:1;cursor:pointer;font-family:inherit;font-weight:900;font-size:15px;padding:14px;border-radius:16px;border:0}
+.r-again{color:#fff;background:linear-gradient(180deg,#ffb23e,var(--gold))}
+.r-prin{color:var(--teal-d);background:#eafaff;border:1.5px solid var(--line)!important}
+
+/* 原理讲解弹窗 */
+.prinm-card{max-width:404px;text-align:left;padding:28px 24px;max-height:90dvh;overflow-y:auto}
+.prinm-title{font-size:22px;font-weight:900;color:var(--ink);text-align:center;margin-bottom:18px}
+.prinm-lead{margin-bottom:24px}
+.prinm-lead p{font-size:15px;color:var(--ink2);line-height:1.78;margin-bottom:12px}
+.prinm-lead p:last-child{margin-bottom:0}
+.prinm-lead b{color:var(--teal-d)}
+.prinm-lead u{text-decoration:none;font-weight:900;color:var(--gold-d);background:rgba(255,159,28,.18);padding:1px 6px;border-radius:6px}
+.prinm-steps{list-style:none;display:flex;flex-direction:column;gap:17px;margin-bottom:24px}
+.prinm-steps .s-h{display:block;font-size:16px;font-weight:900;color:var(--ink);line-height:1.45}
+.prinm-steps .s-b{display:block;font-size:13.5px;color:var(--ink2);line-height:1.6;margin-top:5px}
+.prinm-steps b{color:var(--red-d)} .prinm-steps #prinmDivisor{color:var(--red-d)}
+.prinm-eg{background:rgba(255,159,28,.1);border:1.5px solid rgba(255,159,28,.3);border-radius:16px;
+  padding:4px 18px 16px;margin-bottom:22px}
+.eg-h{font-size:13px;font-weight:900;color:var(--gold-d);letter-spacing:.06em;text-align:center;
+  padding:12px 0 10px;margin-bottom:6px;border-bottom:1.5px dashed rgba(255,159,28,.4)}
+.eg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:15px;color:var(--ink2);padding:6px 0}
+.eg-row b{color:var(--ink);font-weight:900;font-variant-numeric:tabular-nums}
+.eg-concl{font-size:15px;color:var(--ink);line-height:1.65;margin-top:8px}
+.eg-concl b{color:var(--gold-d)} .eg-concl .cps{color:var(--teal-d);font-weight:900}
+.eg-concl.div{margin-top:12px;padding-top:11px;border-top:1.5px dashed rgba(255,159,28,.4)}
+.prinm-switch{width:100%;display:flex;align-items:center;gap:11px;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:800;color:var(--ink2);background:rgba(11,182,196,.08);
+  border:1.5px solid rgba(11,182,196,.25);border-radius:14px;padding:13px 15px;margin-bottom:11px;text-align:left}
+.prinm-switch .sw{flex:0 0 auto;width:44px;height:25px;border-radius:999px;background:#cfdce3;position:relative;transition:.2s}
+.prinm-switch .sw::after{content:"";position:absolute;top:2.5px;left:2.5px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.prinm-switch.on{color:var(--teal-d);background:rgba(11,182,196,.15);border-color:var(--teal)}
+.prinm-switch.on .sw{background:var(--teal)} .prinm-switch.on .sw::after{left:21.5px}
+
+/* 图例：谁报的什么色 */
+.legend{display:flex;gap:18px;font-size:12.5px;font-weight:800;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend span::before{content:"";width:14px;height:14px;border-radius:5px}
+.legend .lg-you::before{background:linear-gradient(180deg,#ffc24d,var(--gold))}
+.legend .lg-opp::before{background:linear-gradient(180deg,#62c6ff,#2f8fe0)}
+
+/* 规则弹窗 */
+.intro-rules{text-align:left;margin:4px 0 14px;padding:0;list-style:none;counter-reset:r}
+.intro-rules li{position:relative;padding:9px 0 9px 36px;font-size:15px;color:var(--ink2);
+  border-bottom:1px solid var(--line);counter-increment:r;line-height:1.4}
+.intro-rules li:last-child{border-bottom:0}
+.intro-rules li::before{content:counter(r);position:absolute;left:0;top:8px;width:25px;height:25px;
+  border-radius:50%;background:var(--teal);color:#fff;font-weight:900;font-size:13px;
+  display:flex;align-items:center;justify-content:center}
+.intro-rules b{color:var(--ink)}
+.intro-tip{font-size:13px;font-weight:700;color:var(--teal-d);background:rgba(11,182,196,.1);
+  border-radius:12px;padding:10px 13px;margin-bottom:16px}
+
+@media (max-height:560px){.tnum{font-size:clamp(50px,14vh,110px)}.arena{gap:6px}}
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<main class="stage">
+
+  <div class="topbar">
+    <div class="brand">数字<span>陷阱</span></div>
+    <div class="tools">
+      <button class="tbtn" id="btnRules">规则</button>
+      <button class="tbtn" id="btnPrin">原理</button>
+      <button class="tbtn" id="btnSet">设置</button>
+      <button class="tbtn" id="btnReset">重开</button>
+    </div>
+    <div class="set-hint" id="setHint">👆 想换数字 / 玩法？点「设置」</div>
+  </div>
+
+  <div class="arena">
+    <div class="targetwrap">
+      <div class="tlabel">本次陷阱数字</div>
+      <div class="tnum" id="tNum">17<small id="ruleHint">报到它就输</small></div>
+    </div>
+
+    <div class="trackwrap">
+      <div class="track" id="track"></div>
+      <div class="legend"><span class="lg-you">你报的</span><span class="lg-opp" id="lgOpp">对方报的</span></div>
+      <div class="prin-note" id="prinNote"></div>
+    </div>
+
+    <div class="control">
+      <div class="turnline" id="turnLine"><span class="dot"></span><span>准备开始</span></div>
+      <div class="saybar" id="sayBar"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- settings sheet -->
+<div class="sheet" id="sheet">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <div class="sheet-h">游戏设置</div>
+      <button class="sheet-x" id="sheetX">✕</button>
+    </div>
+    <div class="sheet-sub">想怎么玩自己调，改完点最下面「开始玩」</div>
+
+    <div class="field">
+      <div class="lab">🎯 陷阱数字</div>
+      <div class="hint">数到这个数就算输。默认 17，可以加减或直接选</div>
+      <div class="stepper">
+        <button id="tMinus">−</button>
+        <input id="inpTarget" type="number" inputmode="numeric" value="17" min="2" max="99">
+        <button id="tPlus">+</button>
+      </div>
+      <div class="chips" id="presetTargets"></div>
+    </div>
+
+    <div class="field">
+      <div class="lab">🔢 每次最多报几个</div>
+      <div class="hint">每人一轮能报 1 到几个连续的数。默认 2，也最经典</div>
+      <div class="seg" id="segK"></div>
+    </div>
+
+    <div class="field">
+      <div class="lab">🥇 谁先报</div>
+      <div class="hint">谁先开口会直接决定输赢——这正是这个游戏的窍门</div>
+      <div class="seg gold" id="segFirst">
+        <button data-first="you">你先报</button>
+        <button data-first="opp">对方先报</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="lab">🤖 跟谁玩</div>
+      <div class="hint">电脑会走最优解、不会让你；两人轮流＝你和朋友用一台手机</div>
+      <div class="seg" id="segOpp">
+        <button data-opp="ai">对战电脑</button>
+        <button data-opp="human">两人轮流</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="lab">⚖️ 胜负规则</div>
+      <div class="hint">默认报到陷阱数字＝输；也能反过来，比谁先抢到</div>
+      <div class="seg" id="segRule">
+        <button data-rule="lose">报到＝输</button>
+        <button data-rule="win">报到＝赢</button>
+      </div>
+    </div>
+
+    <button class="sheet-go" id="sheetGo">开始玩 →</button>
+  </div>
+</div>
+
+<!-- 开局规则 -->
+<div class="result intro" id="intro">
+  <div class="result-card">
+    <div class="r-emoji">🎯</div>
+    <div class="r-title" style="color:var(--ink)">数字陷阱 · 怎么玩</div>
+    <ol class="intro-rules">
+      <li>从 <b>1</b> 开始，两人轮流往上报数</li>
+      <li>每次报 <b id="introK">1~2</b> 个连续的数</li>
+      <li>谁报到那个 <b style="color:var(--red-d)">陷阱数字</b>，谁就掉进陷阱、<b style="color:var(--red-d)">算输</b></li>
+    </ol>
+    <div class="intro-tip">💡 想搞懂为什么能赢、学会自己算？点右上角「原理」</div>
+    <button class="r-again" id="introGo" style="width:100%">开始玩 →</button>
+  </div>
+</div>
+
+<!-- result -->
+<div class="result" id="result">
+  <div class="result-card">
+    <div class="r-emoji" id="rEmoji">🏖️</div>
+    <div class="r-title" id="rTitle"></div>
+    <div class="r-text" id="rText"></div>
+    <div class="r-btns">
+      <button class="r-prin" id="rPrin">看原理</button>
+      <button class="r-again" id="rAgain">再来一局</button>
+    </div>
+  </div>
+</div>
+
+<!-- 原理讲解 -->
+<div class="result" id="prinModal">
+  <div class="result-card prinm-card">
+    <div class="prinm-title">🧠 怎么自己算，每次都赢</div>
+    <div class="prinm-lead">
+      <p>你一次最多报 <b>K</b> 个，对方至少报 1 个。</p>
+      <p>所以不管对方报几个，你总能把这一轮 <u>凑满 K+1 个</u> —— 这一组的落点，攥在你手里。</p>
+      <p>每轮都凑满一组，你就一直踩在「安全点」上，对方只能一步步被推到陷阱里。</p>
+    </div>
+    <ol class="prinm-steps">
+      <li><span class="s-h">① 先定一组多大</span><span class="s-b">一组 ＝ <b>K ＋ 1</b> 个（K＝你一次最多报几个）</span></li>
+      <li><span class="s-h">② 算 <span id="prinmDivisor">(N−1)</span> ÷ (K+1) 的余数</span><span class="s-b">余 <b>0</b> → 让<b>对方先报</b>；余 <b>r</b> → <b>你先报</b>、第一手就报 r 个</span></li>
+      <li><span class="s-h">③ 之后每轮凑满 K+1</span><span class="s-b">对方报 x 个，你就跟着报 <b>(K+1−x)</b> 个</span></li>
+    </ol>
+    <div class="prinm-eg" id="prinmEg"></div>
+    <button class="prinm-switch" id="prinSwitch"><span class="sw"></span><span>把安全点和下一步标在跑道上</span></button>
+    <button class="r-again" id="prinClose" style="width:100%">懂了，去玩 →</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==================== STATE ==================== */
+const S = {
+  target: 17, k: 2, first: 'you', rule: 'lose', opp: 'ai',
+  showPrin: false, count: 0, turn: 'you', moves: [], over: false, sol: null
+};
+const PRESETS = [10, 17, 22, 30];
+const KOPTS = [1, 2, 3, 4];
+const $ = (id) => document.getElementById(id);
+const nameOf = (w) => w === 'you' ? '你' : (S.opp === 'ai' ? '电脑' : '对方');
+
+/* ==================== SOLVER ==================== */
+// 倒推 DP：win[c] = 轮到自己、已报到 c 时能否必胜（已通过断言验证）
+function solve(N, K, rule) {
+  const win = new Array(N + 1).fill(false);
+  const best = new Array(N + 1).fill(1);
+  const winReplies = (c) => {
+    let n = 0; const mm = Math.min(K, N - c);
+    for (let m = 1; m <= mm; m++) { const nc = c + m; if ((nc === N) ? (rule === 'win') : !win[nc]) n++; }
+    return n;
+  };
+  for (let c = N - 1; c >= 0; c--) {
+    const mm = Math.min(K, N - c);
+    let chosen = 0;
+    for (let m = 1; m <= mm; m++) {
+      const nc = c + m;
+      if ((nc === N) ? (rule === 'win') : !win[nc]) { win[c] = true; chosen = m; break; }
+    }
+    if (win[c]) { best[c] = chosen; continue; }
+    let bm = 0, fewest = Infinity;
+    for (let m = 1; m <= mm; m++) {
+      const nc = c + m; if (nc === N) continue;
+      const wr = winReplies(nc); if (wr < fewest) { fewest = wr; bm = m; }
+    }
+    best[c] = bm || 1;
+  }
+  return { win, best };
+}
+function recompute() { S.sol = solve(S.target, S.k, S.rule); }
+function controlPoints() {
+  const p = []; for (let c = 1; c < S.target; c++) if (!S.sol.win[c]) p.push(c); return p;
+}
+function outcome() {
+  const firstMoverWins = S.sol.win[0];
+  return { firstMoverWins, youWin: (S.first === 'you') ? firstMoverWins : !firstMoverWins };
+}
+
+/* ==================== RENDER ==================== */
+function actionable() {
+  if (S.over) return false;
+  if (S.opp === 'ai' && S.turn === 'opp') return false;
+  return true;
+}
+
+function renderTarget() {
+  $('tNum').innerHTML = `${S.target}<small>${S.rule === 'lose' ? '报到它就输' : '报到它就赢'}</small>`;
+  document.querySelector('.tlabel').textContent = S.rule === 'lose' ? '本次陷阱数字' : '本次目标数字';
+}
+
+function renderTrack() {
+  const N = S.target, ctrl = new Set(controlPoints());
+  const best = (S.showPrin && actionable()) ? S.sol.best[S.count] : 0;
+  const recCell = best ? S.count + best : -1;
+  // 每个数字是谁报的
+  const owner = {}; let p = 0;
+  for (const mv of S.moves) { for (let c = p + 1; c <= mv.to; c++) owner[c] = mv.who; p = mv.to; }
+  let h = '';
+  for (let c = 1; c <= N; c++) {
+    const cl = ['cell'];
+    if (ctrl.has(c)) cl.push('ctrl');
+    if (owner[c]) cl.push('by-' + owner[c]);
+    if (c === S.count) cl.push('cur');
+    if (c === N) cl.push(S.rule === 'lose' ? 'trap' : 'goal');
+    if (c === recCell) cl.push('rec');
+    h += `<div class="${cl.join(' ')}">${c}</div>`;
+  }
+  $('track').innerHTML = h;
+  $('lgOpp').textContent = (S.opp === 'ai' ? '电脑' : '对方') + '报的';
+}
+
+function renderControl() {
+  const tl = $('turnLine');
+  tl.className = 'turnline ' + (S.over ? 'done' : S.turn);
+  if (S.over) tl.innerHTML = '<span class="dot"></span><span>这局结束了</span>';
+  else if (S.opp === 'ai' && S.turn === 'opp') tl.innerHTML = '<span class="dot"></span><span>电脑在想…</span>';
+  else tl.innerHTML = `<span class="dot"></span><span>轮到 ${nameOf(S.turn)}报 · 已报到 <b>${S.count}</b></span>`;
+
+  const maxm = Math.min(S.k, S.target - S.count), best = S.sol.best[S.count];
+  let h = '';
+  for (let m = 1; m <= maxm; m++) {
+    const rec = (S.showPrin && actionable() && m === best) ? ' rec' : '';
+    const dis = actionable() ? '' : 'disabled';
+    h += `<button class="sbtn${rec}" data-say="${m}" ${dis}>说 ${m} 个<small>报到 ${S.count + m}</small></button>`;
+  }
+  $('sayBar').innerHTML = h;
+}
+
+function renderPrinNote() {
+  const g = S.k + 1, N = S.target, el = $('prinNote');
+  if (S.over) {
+    el.innerHTML = `<div class="big">🎯 跟着绿格子走就赢</div><div class="sub">每轮和对方凑满 ${g} 个，对方只能踩到 <b>${N}</b></div>`;
+    return;
+  }
+  if (!actionable()) {
+    el.innerHTML = `<div class="big">⏳ 等对方报…</div><div class="sub">轮到你时，把数报到发光的绿格子上</div>`;
+    return;
+  }
+  const best = S.sol.best[S.count], nc = S.count + best;
+  if (S.sol.win[S.count]) {
+    el.innerHTML =
+      `<div class="big">👉 把数报到 ${nc}，点「<b>说 ${best} 个</b>」</div>` +
+      `<div class="sub">每轮凑满 ${g} 个，对方就只能踩到 <b>${N}</b></div>`;
+  } else {
+    el.innerHTML =
+      `<div class="big">😅 这局先手被对方占了</div>` +
+      `<div class="sub">想赢就去「设置」把先手让给对方，或换个陷阱数字</div>`;
+  }
+}
+
+function setOn(boxId, key, val) {
+  document.querySelectorAll(`#${boxId} button`).forEach(b => b.classList.toggle('on', b.dataset[key] === val));
+}
+function renderSheet() {
+  $('segK').innerHTML = KOPTS.map(k => `<button data-k="${k}" class="${k === S.k ? 'on' : ''}">${k}</button>`).join('');
+  $('presetTargets').innerHTML = PRESETS.map(t => `<button class="chip ${t === S.target ? 'on' : ''}" data-target="${t}">${t}</button>`).join('');
+  $('inpTarget').value = S.target;
+  setOn('segFirst', 'first', S.first);
+  setOn('segOpp', 'opp', S.opp);
+  setOn('segRule', 'rule', S.rule);
+}
+
+function renderAll() {
+  recompute();
+  renderTarget();
+  renderTrack();
+  renderControl();
+  renderPrinNote();
+  renderSheet();
+}
+
+/* ==================== PLAY ==================== */
+let aiTimer = null;
+const other = (w) => w === 'you' ? 'opp' : 'you';
+
+function reset() {
+  clearTimeout(aiTimer);
+  S.count = 0; S.moves = []; S.over = false; S.turn = S.first;
+  hideResult(); maybeAI();
+}
+
+function doSay(m, isAI) {
+  if (S.over) return;
+  if (!isAI && !actionable()) return;
+  const maxm = Math.min(S.k, S.target - S.count);
+  if (m < 1 || m > maxm) return;
+  const who = S.turn;
+  S.count += m;
+  S.moves.push({ who, n: m, to: S.count });
+  if (S.count === S.target) { S.over = true; renderAll(); endGame(who); return; }
+  S.turn = other(who);
+  renderAll(); maybeAI();
+}
+
+function maybeAI() {
+  clearTimeout(aiTimer);
+  if (S.over || S.opp !== 'ai' || S.turn !== 'opp') return;
+  aiTimer = setTimeout(() => doSay(S.sol.best[S.count], true), 620);
+}
+
+function endGame(who) {
+  const youWon = (S.rule === 'lose') ? (who !== 'you') : (who === 'you');
+  showResult(youWon, who);
+}
+
+function showResult(youWon, who) {
+  const r = $('result');
+  r.classList.add('show');
+  r.classList.toggle('win', youWon);
+  r.classList.toggle('lose', !youWon);
+  $('rEmoji').textContent = youWon ? '🏆' : '💦';
+  $('rTitle').textContent = youWon ? '你赢了！' : '掉陷阱了';
+  const reached = `${nameOf(who)}报到了 ${S.target}`;
+  if (S.rule === 'lose')
+    $('rText').innerHTML = youWon
+      ? `${reached}，<b>踩中陷阱</b>。`
+      : `${reached}，<b>踩中陷阱</b>。点「看原理」看看怎么破。`;
+  else
+    $('rText').innerHTML = youWon
+      ? `${reached}，<b>抢到目标</b>！`
+      : `${reached}，被对方抢先。点「看原理」翻盘。`;
+}
+function hideResult() { $('result').classList.remove('show'); }
+
+/* ==================== INIT ==================== */
+function setOrient() {
+  const land = window.innerWidth > window.innerHeight;
+  document.body.classList.toggle('is-land', land);
+  document.body.classList.toggle('is-portrait', !land);
+}
+const clampT = (v) => Math.max(2, Math.min(99, Math.round(v) || 2));
+function setTarget(v) { S.target = clampT(v); reset(); renderAll(); }
+
+function openSheet() { renderSheet(); $('sheet').classList.add('show'); $('setHint').classList.add('hide'); }
+function closeSheet() { $('sheet').classList.remove('show'); }
+function togglePrin(force) {
+  S.showPrin = (force === undefined) ? !S.showPrin : force;
+  document.body.classList.toggle('show-prin', S.showPrin);
+  $('btnPrin').classList.toggle('on', S.showPrin);
+  $('prinSwitch').classList.toggle('on', S.showPrin);
+  renderAll();
+}
+function renderPrinModal() {
+  const g = S.k + 1, N = S.target, K = S.k;
+  const fmw = S.sol.win[0], open = S.sol.best[0];
+  const base = S.rule === 'lose' ? (N - 1) : N;
+  const baseLabel = S.rule === 'lose' ? '(N−1)' : 'N';
+  const r = fmw ? open : 0;
+  const cps = controlPoints();
+  const plan = fmw ? `余 ${r} → <b>你先报，第一手报 ${open} 个</b>` : `余 0 → <b>让对方先报</b>`;
+  $('prinmDivisor').textContent = baseLabel;
+  $('prinmEg').innerHTML =
+    `<div class="eg-h">套进这一局</div>` +
+    `<div class="eg-row"><span>陷阱数字</span><b>N ＝ ${N}</b></div>` +
+    `<div class="eg-row"><span>一次最多报</span><b>K ＝ ${K}</b></div>` +
+    `<div class="eg-row"><span>一组 ＝ K＋1</span><b>${K}＋1 ＝ ${g}</b></div>` +
+    `<div class="eg-row"><span>${baseLabel} ÷ ${g}</span><b>${base} ÷ ${g} ＝ 余 ${r}</b></div>` +
+    `<div class="eg-concl div">${plan}</div>` +
+    `<div class="eg-concl">安全点 <span class="cps">${cps.join(' · ') || '—'}</span>，对方只能踩到 ${N}</div>`;
+  $('prinSwitch').classList.toggle('on', S.showPrin);
+}
+function openPrinModal() { renderPrinModal(); $('prinModal').classList.add('show'); }
+function closePrinModal() { $('prinModal').classList.remove('show'); }
+function showIntro() { $('introK').textContent = `1~${S.k}`; $('intro').classList.add('show'); }
+function hideIntro() { $('intro').classList.remove('show'); }
+
+function bind() {
+  $('btnPrin').addEventListener('click', openPrinModal);
+  $('btnSet').addEventListener('click', openSheet);
+  $('setHint').addEventListener('click', openSheet);
+  $('btnReset').addEventListener('click', () => { reset(); renderAll(); });
+  $('sheetGo').addEventListener('click', () => { closeSheet(); reset(); renderAll(); });
+  $('sheetX').addEventListener('click', closeSheet);
+  $('sheet').addEventListener('click', e => { if (e.target === $('sheet')) closeSheet(); });
+  $('segK').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.k = +b.dataset.k; reset(); renderAll(); });
+  $('presetTargets').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; setTarget(+b.dataset.target); });
+  $('inpTarget').addEventListener('change', e => setTarget(+e.target.value));
+  $('tMinus').addEventListener('click', () => setTarget(S.target - 1));
+  $('tPlus').addEventListener('click', () => setTarget(S.target + 1));
+  $('segFirst').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.first = b.dataset.first; reset(); renderAll(); });
+  $('segOpp').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.opp = b.dataset.opp; reset(); renderAll(); });
+  $('segRule').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.rule = b.dataset.rule; reset(); renderAll(); });
+  $('sayBar').addEventListener('click', e => { const b = e.target.closest('button[data-say]'); if (!b) return; doSay(+b.dataset.say, false); });
+  $('rAgain').addEventListener('click', () => { reset(); renderAll(); });
+  $('rPrin').addEventListener('click', () => { hideResult(); openPrinModal(); });
+  $('prinSwitch').addEventListener('click', () => togglePrin());
+  $('prinClose').addEventListener('click', closePrinModal);
+  $('prinModal').addEventListener('click', e => { if (e.target === $('prinModal')) closePrinModal(); });
+  $('btnRules').addEventListener('click', showIntro);
+  $('introGo').addEventListener('click', hideIntro);
+  $('intro').addEventListener('click', e => { if (e.target === $('intro')) hideIntro(); });
+  window.addEventListener('resize', setOrient);
+}
+
+setOrient();
+recompute();
+reset();
+bind();
+renderAll();
+showIntro();
+</script>
+</body>
+</html>
